@@ -2,7 +2,7 @@
   "name": "kmdo_backend",
   "version": "1.0.0",
   "engines": {
-    "node": "^10"
+    "node": ">=12.0.0"
   },
   "description": "",
   "main": "index.js",
