@@ -56,12 +56,12 @@ router.post('/area/create', async (req, res) => {
         return res.status(400).json({ message: error.message })
     }
 });
-router.get("/all",ensureAuth, async (req, res) => {
+router.get("/all", async (req, res) => {
     await VillageCollection.find().toArray().then(villages=>{
         res.status(200).json(villages);
     })
 });
-router.get("/areas/all",ensureAuth, async (req, res) => {
+router.get("/areas/all", async (req, res) => {
     await AreaCollection.find().toArray().then(areas=>{
         res.status(200).json(areas);
     })

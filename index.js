@@ -19,7 +19,7 @@ const process =require('process');
 const app=express()
 // Cross-origin resource sharing (CORS) is a mechanism that allows 
 //restricted resources on a web page to be requested from another domain outside the domain from which the first resource was served
-const whitelist = ['https://wira-frontends.herokuapp.com', 'http://localhost:3000']
+const whitelist = ['https:www.karingamasive.org', 'http://localhost:3000']
 app.use(cors({
   origin: whitelist,
   methods: ['POST', 'PUT', 'GET', 'OPTIONS', 'HEAD', 'DELETE'],

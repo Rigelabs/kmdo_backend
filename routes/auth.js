@@ -102,6 +102,7 @@ router.post('/user/create', async (req, res) => {
                 avatar: "https://res.cloudinary.com/dfnuodjiw/image/upload/v1650034813/logos/construction_woman_bmlnma.jpg",
                 cloudinary_id: "construction_woman_bmlnma"
             }).then(saved => {
+                
                 return res.status(200).json({ message: "Account registered successfully, Please wait for validation" });
             }).catch(error => {
                 return (res.status(500).json({ message: "Error saving account, try again" }),
@@ -131,12 +132,9 @@ router.post('/user/login', async (req, res) => {
             //check if contact  exist in database
             await AuthDBCollection.findOne({ contact: contact }).then(user => {
 
-                if (!user) {
-                    res.status(400).json({ message: "Account doesn't not exist" })
+                if (!user || user.status!=="ACTIVE") {
+                    res.status(401).json({ message: "Account doesn't not exist / inactive" })
                 } else {
-                    //check if rank is Admin
-
-
                     //check if password match
 
                     const validpass = bcrypt.compareSync(password, user.password);
