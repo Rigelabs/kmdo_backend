@@ -95,6 +95,7 @@ router.post('/user/create', async (req, res) => {
                 status: "PENDING",
                 rank: "MEMBER",
                 area: area,
+                score:1.0,
                 email: email,
                 createdAt: new Date,
                 registration_number: registration_number,
