@@ -384,7 +384,7 @@ router.post('/user/request_code', async (req, res) => {
                     if (err) {
                         return res.status(400).json({ message: err })
                     }
-                    res.status(200).json(`Hello ${user.full_name}, your verification code is: ${otp_code}. Expires in 1 hr`,)
+                    res.status(200).json({message:`Hello ${user.full_name}, your verification code is: ${otp_code}. Expires in 1 hr`})
                     //twilioSMS(`Hello ${user.full_name}, your verification code is: ${otp_code}. Expires in 3 Minutes`, user.contact).then(reply => {
                     // return res.status(200).json(`Hello ${user.full_name}, your verification code is: ${otp_code}. Expires in 3 Minutes`,)
                     // }).catch(e => { return res.status(400).json({ message: e }) })
