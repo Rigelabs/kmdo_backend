@@ -8,6 +8,7 @@ module.exports ={
         const authHeader= req.headers['authorization'];
         
         try {
+           
             if (authHeader){
                 const bearer=authHeader.split(' ');
                 const token = bearer[1];
@@ -15,6 +16,7 @@ module.exports ={
                 const user = jwt.verify(token, process.env.TOKEN_SECRET) 
                
                 req.user =user;
+
                 next();
             }else{
                 logger.error(`Invalid request ${req.originalUrl} - ${req.method} - ${req.ip}`);

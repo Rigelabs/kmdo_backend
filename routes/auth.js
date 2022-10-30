@@ -201,7 +201,7 @@ router.delete("/user/delete/:id", ensureAdmin, ensureActive, async (req, res) =>
 
 //Updating user profile
 router.put("/user/update", uploads.single("avatar"), ensureAuth, ensureActive, async (req, res) => {
-
+   
     try {
         await AuthDBCollection.findOne({ contact: req.body.contact }).then(user => {
 
@@ -211,7 +211,7 @@ router.put("/user/update", uploads.single("avatar"), ensureAuth, ensureActive, a
                     cloudinary.uploader.upload(req.file.path,{
                         folder:`users/${user.registration_number}/`,
                         secure: true,transformation: [
-                            {width: 200, height: 2000, gravity: "face", crop: "thumb"}]
+                            {width: 200, height: 200, gravity: "face", crop: "thumb"}]
                     }).then(result => {
 
                         const data = {
@@ -281,13 +281,13 @@ router.put("/user/update", uploads.single("avatar"), ensureAuth, ensureActive, a
 });
 
 
-//fetch all users
-router.get('/users/all', generalrateLimiterMiddleware, ensureAuth, ensureActive, ensureRepresentative, async (req, res, next) => {
+//fetch all users for admin
+router.get('/users/admin/all', generalrateLimiterMiddleware, ensureAuth, ensureActive, ensureRepresentative, async (req, res, next) => {
 
     try {
-        if (req.user.rank === "ADMIN") {
+        if (req.user.rank === "ADMIN" || req.user.rank === "SUPERADMIN") {
             //check data in redisStore
-            await redisClient.get('users', (err, result) => {
+            await redisClient.get('users_admin', (err, result) => {
                 if (err) {
                     console.log(err)
                     logger.error(err)
@@ -299,7 +299,7 @@ router.get('/users/all', generalrateLimiterMiddleware, ensureAuth, ensureActive,
                     //fetch for Auth from DB and cache it
                     AuthDBCollection.find({}, { projection: { "password": 0 } }).toArray().then((data) => {//fetch all documents
 
-                        redisClient.set("users", JSON.stringify(data), 'EX', 600)
+                        redisClient.set("users_admin", JSON.stringify(data), 'EX', 600)
                         return res.status(200).json(data)
 
                     }).catch(err => {
@@ -341,8 +341,80 @@ router.get('/users/all', generalrateLimiterMiddleware, ensureAuth, ensureActive,
     }
 
 });
+//fetch all users for all
+router.get('/users/all', generalrateLimiterMiddleware, ensureAuth, ensureActive, async (req, res, next) => {
 
+    try {
+       
+            //check data in redisStore
+            await redisClient.get('users', (err, result) => {
+                if (err) {
+                    console.log(err)
+                    logger.error(err)
+                }
+                if (result !== null) {
 
+                    return res.status(200).json(JSON.parse(result))
+                } else {
+                    //fetch for Auth from DB and cache it
+                    AuthDBCollection.find({}, { projection: { "password": 0 } }).toArray().then((data) => {//fetch all documents
+
+                        redisClient.set("users", JSON.stringify(data), 'EX', 600)
+                        return res.status(200).json(data)
+
+                    }).catch(err => {
+                        return logger.error(err)
+                    })
+
+                }
+            })
+    } catch (error) {
+        logger.error(`${error.status || 500} - ${res.statusMessage} - ${error.message} - ${req.originalUrl} - ${req.method} - ${req.ip}`);
+        return res.status(400).json({ message: error.message })
+    }
+
+});
+//fetch all users for all
+router.post('/users/search', generalrateLimiterMiddleware, ensureAuth, ensureActive, async (req, res, next) => {
+
+    try {
+            const keyword=req.body.keyword;
+           
+            //check data in redisStore
+            await redisClient.get(`${keyword}_users`, (err, result) => {
+                if (err) {
+                    console.log(err)
+                    logger.error(err)
+                }
+                if (result !== null) {
+
+                    return res.status(200).json(JSON.parse(result))
+                } else {
+                    //fetch for Auth from DB and cache it
+                AuthDBCollection.find({
+                    $or:[
+                        {"full_name":new RegExp('.*' + keyword + '.*')},
+                        {"area":new RegExp('.*' + keyword + '.*')},
+                        {"village":new RegExp('.*' + keyword + '.*')},
+                        {"occupation":new RegExp('.*' + keyword + '.*')}
+                    ]},
+                     { projection: { "password": 0 } }).toArray().then((data) => {//fetch all documents
+
+                        redisClient.set(`${keyword}_users`, JSON.stringify(data), 'EX', 600)
+                        return res.status(200).json(data)
+
+                    }).catch(err => {
+                        return logger.error(err)
+                    })
+
+                }
+            })
+    } catch (error) {
+        logger.error(`${error.status || 500} - ${res.statusMessage} - ${error.message} - ${req.originalUrl} - ${req.method} - ${req.ip}`);
+        return res.status(400).json({ message: error.message })
+    }
+
+});
 //get a user
 router.get('/user', ensureAuth, ensureActive, async (req, res) => {
 
@@ -399,6 +471,7 @@ router.post('/user/request_code', async (req, res) => {
 
     }
 });
+
 
 
 //verify otpcode and change password
