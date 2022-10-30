@@ -24,7 +24,7 @@ const schema = Joi.object({
 
     full_name: Joi.string().required().max(20).min(3),
     identification_number: Joi.string().required().max(10).min(7),
-    password: Joi.string().required().max(20).min(3),
+   
     contact: Joi.string().required().min(13).max(14).error(new Error("Invalid Phone Number")),
     village: Joi.string().required(),
     email: Joi.string().required().regex(/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/),
@@ -72,24 +72,17 @@ router.post('/user/create', async (req, res) => {
     try {
         const bodyerror = await schema.validateAsync(req.body);
         const { contact, identification_number, email, registration_number, occupation, full_name,
-            village, area, password } = req.body;
+            village, area } = req.body;
         //check if contact already exist in database
 
         await AuthDBCollection.findOne({ contact: contact }).then(user_exist => {
             if (user_exist) {
                 return res.status(400).json({ message: `User already exist` })
             }
-            //Hash the password
-            const salt = bcrypt.genSaltSync(10);
-            const hashedPassword = bcrypt.hashSync(password, salt);
-
-
-            //create new user object after validation and hashing
 
             AuthDBCollection.insertOne({
                 full_name: full_name,
                 occupation: occupation,
-                password: hashedPassword,
                 contact: contact,
                 village: village,
                 status: "PENDING",
@@ -100,8 +93,8 @@ router.post('/user/create', async (req, res) => {
                 createdAt: new Date,
                 registration_number: registration_number,
                 identification_number: identification_number,
-                avatar: "https://res.cloudinary.com/dfnuodjiw/image/upload/v1650034813/logos/construction_woman_bmlnma.jpg",
-                cloudinary_id: "construction_woman_bmlnma"
+                avatar: "https://res.cloudinary.com/dwnxsji2z/image/upload/v1667125758/website%20files/user-avatar_ina40n.png",
+                cloudinary_id: "user-avatar_ina40n"
             }).then(saved => {
                 
                 return res.status(200).json({ message: "Account registered successfully, Please wait for validation" });
@@ -215,7 +208,11 @@ router.put("/user/update", uploads.single("avatar"), ensureAuth, ensureActive, a
             if (user) {
 
                 if (req.file) {
-                    cloudinary.uploader.upload(req.file.path).then(result => {
+                    cloudinary.uploader.upload(req.file.path,{
+                        folder:`users/${user.registration_number}/`,
+                        secure: true,transformation: [
+                            {width: 200, height: 2000, gravity: "face", crop: "thumb"}]
+                    }).then(result => {
 
                         const data = {
                             occupation: req.body.occupation ? req.body.occupation : user.occupation,
@@ -223,8 +220,8 @@ router.put("/user/update", uploads.single("avatar"), ensureAuth, ensureActive, a
                             area: req.body.area ? req.body.area : user.area,
                             email: req.body.email ? req.body.email : user.email,
                             full_name: req.body.full_name ? req.body.full_name : user.full_name,
-                            status: req.body.status && req.user.rank === "ADMIN" ? req.body.status : user.status,
-                            rank: req.body.rank && req.user.rank === "ADMIN" ? req.body.rank : user.rank,
+                            status: req.body.status && req.user.rank === "SUPERADMIN" ? req.body.status : user.status,
+                            rank: req.body.rank && req.user.rank === "SUPERADMIN" ? req.body.rank : user.rank,
                             avatar: result ? result.secure_url : user.avatar,
                             cloudinary_id: result ? result.public_id : user.cloudinary_id
                         }
@@ -249,8 +246,8 @@ router.put("/user/update", uploads.single("avatar"), ensureAuth, ensureActive, a
                         area: req.body.area ? req.body.area : user.area,
                         email: req.body.email ? req.body.email : user.email,
                         full_name: req.body.full_name ? req.body.full_name : user.full_name,
-                        status: req.body.status && req.user.rank === "ADMIN" ? req.body.status : user.status,
-                        rank: req.body.rank && req.user.rank === "ADMIN" ? req.body.rank : user.rank,
+                        status: req.body.status && req.user.rank === "SUPERADMIN" ? req.body.status : user.status,
+                        rank: req.body.rank && req.user.rank === "SUPERADMIN" ? req.body.rank : user.rank,
                        
                     }
 
