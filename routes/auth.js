@@ -24,7 +24,7 @@ const schema = Joi.object({
 
     full_name: Joi.string().required().max(20).min(3),
     identification_number: Joi.string().required().max(10).min(7),
-   
+
     contact: Joi.string().required().min(13).max(14).error(new Error("Invalid Phone Number")),
     village: Joi.string().required(),
     email: Joi.string().required().regex(/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/),
@@ -88,7 +88,7 @@ router.post('/user/create', async (req, res) => {
                 status: "PENDING",
                 rank: "MEMBER",
                 area: area,
-                score:1.0,
+                score: 1.0,
                 email: email,
                 createdAt: new Date,
                 registration_number: registration_number,
@@ -96,7 +96,7 @@ router.post('/user/create', async (req, res) => {
                 avatar: "https://res.cloudinary.com/dwnxsji2z/image/upload/v1667125758/website%20files/user-avatar_ina40n.png",
                 cloudinary_id: "user-avatar_ina40n"
             }).then(saved => {
-                
+
                 return res.status(200).json({ message: "Account registered successfully, Please wait for validation" });
             }).catch(error => {
                 return (res.status(500).json({ message: "Error saving account, try again" }),
@@ -126,7 +126,7 @@ router.post('/user/login', async (req, res) => {
             //check if contact  exist in database
             await AuthDBCollection.findOne({ contact: contact }).then(user => {
 
-                if (!user || user.status!=="ACTIVE") {
+                if (!user || user.status !== "ACTIVE") {
                     res.status(401).json({ message: "Account doesn't not exist / inactive" })
                 } else {
                     //check if password match
@@ -201,17 +201,17 @@ router.delete("/user/delete/:id", ensureAdmin, ensureActive, async (req, res) =>
 
 //Updating user profile
 router.put("/user/update", uploads.single("avatar"), ensureAuth, ensureActive, async (req, res) => {
-   
+
     try {
         await AuthDBCollection.findOne({ contact: req.body.contact }).then(user => {
 
             if (user) {
 
                 if (req.file) {
-                    cloudinary.uploader.upload(req.file.path,{
-                        folder:`users/${user.registration_number}/`,
-                        secure: true,transformation: [
-                            {width: 200, height: 200, gravity: "face", crop: "thumb"}]
+                    cloudinary.uploader.upload(req.file.path, {
+                        folder: `users/${user.registration_number}/`,
+                        secure: true, transformation: [
+                            { width: 200, height: 200, gravity: "face", crop: "thumb" }]
                     }).then(result => {
 
                         const data = {
@@ -239,7 +239,7 @@ router.put("/user/update", uploads.single("avatar"), ensureAuth, ensureActive, a
 
                             })
                     });
-                }else{
+                } else {
                     const data = {
                         occupation: req.body.occupation ? req.body.occupation : user.occupation,
                         village: req.body.village ? req.body.village : user.village,
@@ -248,7 +248,7 @@ router.put("/user/update", uploads.single("avatar"), ensureAuth, ensureActive, a
                         full_name: req.body.full_name ? req.body.full_name : user.full_name,
                         status: req.body.status && req.user.rank === "SUPERADMIN" ? req.body.status : user.status,
                         rank: req.body.rank && req.user.rank === "SUPERADMIN" ? req.body.rank : user.rank,
-                       
+
                     }
 
                     AuthDBCollection.findOneAndUpdate({ contact: req.body.contact }, { $set: data },
@@ -286,20 +286,11 @@ router.get('/users/admin/all', generalrateLimiterMiddleware, ensureAuth, ensureA
 
     try {
         if (req.user.rank === "ADMIN" || req.user.rank === "SUPERADMIN") {
-            //check data in redisStore
-            await redisClient.get('users_admin', (err, result) => {
-                if (err) {
-                    console.log(err)
-                    logger.error(err)
-                }
-                if (result !== null) {
-
-                    return res.status(200).json(JSON.parse(result))
-                } else {
+           
                     //fetch for Auth from DB and cache it
                     AuthDBCollection.find({}, { projection: { "password": 0 } }).toArray().then((data) => {//fetch all documents
 
-                        redisClient.set("users_admin", JSON.stringify(data), 'EX', 600)
+                      
                         return res.status(200).json(data)
 
                     }).catch(err => {
@@ -307,22 +298,10 @@ router.get('/users/admin/all', generalrateLimiterMiddleware, ensureAuth, ensureA
                     })
 
 
-                }
-            })
-
         } else {
             const area = req.user.area
 
-            //check data in redisStore
-            await redisClient.get(`users_${area}`, (err, result) => {
-                if (err) {
-                    console.log(err)
-                    logger.error(err)
-                }
-                if (result !== null) {
-
-                    return res.status(200).json(JSON.parse(result))
-                } else {
+          
                     //fetch for Auth from DB and cache it
                     AuthDBCollection.find({ 'area': area }, { projection: { "password": 0 } }).toArray().then((data) => {//fetch all documents
 
@@ -333,8 +312,7 @@ router.get('/users/admin/all', generalrateLimiterMiddleware, ensureAuth, ensureA
                         return logger.error(err)
                     })
                 }
-            })
-        }
+         
     } catch (error) {
         logger.error(`${error.status || 500} - ${res.statusMessage} - ${error.message} - ${req.originalUrl} - ${req.method} - ${req.ip}`);
         return res.status(400).json({ message: error.message })
@@ -345,60 +323,52 @@ router.get('/users/admin/all', generalrateLimiterMiddleware, ensureAuth, ensureA
 router.get('/users/all', generalrateLimiterMiddleware, ensureAuth, ensureActive, async (req, res, next) => {
 
     try {
-       
-            //check data in redisStore
-            await redisClient.get('users', (err, result) => {
-                if (err) {
-                    console.log(err)
-                    logger.error(err)
-                }
-                if (result !== null) {
 
-                    return res.status(200).json(JSON.parse(result))
-                } else {
-                    //fetch for Auth from DB and cache it
-                    AuthDBCollection.find({}, { projection: { "password": 0 } }).toArray().then((data) => {//fetch all documents
+        //fetch for Auth from DB and cache it
+        AuthDBCollection.find({}, { projection: { "password": 0, } }).toArray().then((data) => {//fetch all documents
 
-                        redisClient.set("users", JSON.stringify(data), 'EX', 600)
-                        return res.status(200).json(data)
 
-                    }).catch(err => {
-                        return logger.error(err)
-                    })
+            return res.status(200).json(data)
 
-                }
-            })
+        }).catch(err => {
+            return logger.error(err)
+        })
+
+    
+          
     } catch (error) {
-        logger.error(`${error.status || 500} - ${res.statusMessage} - ${error.message} - ${req.originalUrl} - ${req.method} - ${req.ip}`);
-        return res.status(400).json({ message: error.message })
-    }
+    logger.error(`${error.status || 500} - ${res.statusMessage} - ${error.message} - ${req.originalUrl} - ${req.method} - ${req.ip}`);
+    return res.status(400).json({ message: error.message })
+}
 
 });
 //fetch all users for all
 router.post('/users/search', generalrateLimiterMiddleware, ensureAuth, ensureActive, async (req, res, next) => {
 
     try {
-            const keyword=req.body.keyword;
-           
-            //check data in redisStore
-            await redisClient.get(`${keyword}_users`, (err, result) => {
-                if (err) {
-                    console.log(err)
-                    logger.error(err)
-                }
-                if (result !== null) {
+        const keyword = req.body.keyword;
 
-                    return res.status(200).json(JSON.parse(result))
-                } else {
-                    //fetch for Auth from DB and cache it
+        //check data in redisStore
+        await redisClient.get(`${keyword}_users`, (err, result) => {
+            if (err) {
+                console.log(err)
+                logger.error(err)
+            }
+            if (result !== null) {
+
+                return res.status(200).json(JSON.parse(result))
+            } else {
+                //fetch for Auth from DB and cache it
                 AuthDBCollection.find({
-                    $or:[
-                        {"full_name":new RegExp('.*' + keyword + '.*')},
-                        {"area":new RegExp('.*' + keyword + '.*')},
-                        {"village":new RegExp('.*' + keyword + '.*')},
-                        {"occupation":new RegExp('.*' + keyword + '.*')}
-                    ]},
-                     { projection: { "password": 0 } }).toArray().then((data) => {//fetch all documents
+                    $or: [
+                        { "full_name": new RegExp('.*' + keyword + '.*') },
+                        { "area": new RegExp('.*' + keyword + '.*') },
+                        { "village": new RegExp('.*' + keyword + '.*') },
+                        { "occupation": new RegExp('.*' + keyword + '.*') },
+                        { "status": new RegExp('.*' + keyword + '.*') }
+                    ]
+                },
+                    { projection: { "password": 0 } }).toArray().then((data) => {//fetch all documents
 
                         redisClient.set(`${keyword}_users`, JSON.stringify(data), 'EX', 600)
                         return res.status(200).json(data)
@@ -407,8 +377,8 @@ router.post('/users/search', generalrateLimiterMiddleware, ensureAuth, ensureAct
                         return logger.error(err)
                     })
 
-                }
-            })
+            }
+        })
     } catch (error) {
         logger.error(`${error.status || 500} - ${res.statusMessage} - ${error.message} - ${req.originalUrl} - ${req.method} - ${req.ip}`);
         return res.status(400).json({ message: error.message })
@@ -454,7 +424,7 @@ router.post('/user/request_code', async (req, res) => {
                     if (err) {
                         return res.status(400).json({ message: err })
                     }
-                    res.status(200).json({message:`Hello ${user.full_name}, your verification code is: ${otp_code}. Expires in 1 hr`})
+                    res.status(200).json({ message: `Hello ${user.full_name}, your verification code is: ${otp_code}. Expires in 1 hr` })
                     //twilioSMS(`Hello ${user.full_name}, your verification code is: ${otp_code}. Expires in 3 Minutes`, user.contact).then(reply => {
                     // return res.status(200).json(`Hello ${user.full_name}, your verification code is: ${otp_code}. Expires in 3 Minutes`,)
                     // }).catch(e => { return res.status(400).json({ message: e }) })
