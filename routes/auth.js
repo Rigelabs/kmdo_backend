@@ -305,7 +305,7 @@ router.get('/users/admin/all', generalrateLimiterMiddleware, ensureAuth, ensureA
                     //fetch for Auth from DB and cache it
                     AuthDBCollection.find({ 'area': area }, { projection: { "password": 0 } }).toArray().then((data) => {//fetch all documents
 
-                        redisClient.set(`users_${area}`, JSON.stringify(data), 'EX', 600)
+                       
                         return res.status(200).json(data)
 
                     }).catch(err => {
