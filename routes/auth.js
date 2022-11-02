@@ -14,6 +14,7 @@ const jwt = require('jsonwebtoken');
 const { RateLimiterRedis } = require('rate-limiter-flexible');
 const { AuthDBConnection } = require("../middlewares/mongodb");
 const { default: mongoose } = require("mongoose");
+const { newUser, sendOTP, sendOTPEmail, newUserNotify, newAccountStatusChange, accountStatusChange } = require("../middlewares/email");
 
 
 const router = express.Router();
@@ -96,7 +97,8 @@ router.post('/user/create', async (req, res) => {
                 avatar: "https://res.cloudinary.com/dwnxsji2z/image/upload/v1667125758/website%20files/user-avatar_ina40n.png",
                 cloudinary_id: "user-avatar_ina40n"
             }).then(saved => {
-
+                newUser(full_name,email);
+                newUserNotify(full_name,area,village,occupation,contact,registration_number);
                 return res.status(200).json({ message: "Account registered successfully, Please wait for validation" });
             }).catch(error => {
                 return (res.status(500).json({ message: "Error saving account, try again" }),
@@ -225,19 +227,27 @@ router.put("/user/update", uploads.single("avatar"), ensureAuth, ensureActive, a
                             avatar: result ? result.secure_url : user.avatar,
                             cloudinary_id: result ? result.public_id : user.cloudinary_id
                         }
-
+                       
                         AuthDBCollection.findOneAndUpdate({ contact: req.body.contact }, { $set: data },
-                            { projection: { 'password': 0 }, returnDocument: "after" }).then(user => {
-                                res.status(200).json(user.value);
-                                if (user.value.status !== "ACTIVE") {
-                                    redisClient.del(user.value._id.toString());
+                            { projection: { 'password': 0 }, returnDocument: "after" }).then(new_user => {
+                              
+                                if(req.body.status!==user.status){
+                                    accountStatusChange(new_user.value.full_name,new_user.value.email,new_user.value.status);
                                 }
+                                if (new_user.value.status !== "ACTIVE") {
+                                    redisClient.del(new_user.value._id.toString());
+                                }
+                                res.status(200).json(new_user.value);
                             }).catch(error => {
 
                                 res.status(500).json({ message: "Error updating user account" });
                                 return logger.error(`Error updating user account, ${req.user.user_id},${error}`);
 
                             })
+                    }).catch(e=>{
+                        
+                        res.status(403).json({ message: "Error updating account, the selected is bigger than 10MB" });
+                        logger.error(`Error updating avatar to cloudinary, ${e.error.message}`)
                     });
                 } else {
                     const data = {
@@ -252,11 +262,15 @@ router.put("/user/update", uploads.single("avatar"), ensureAuth, ensureActive, a
                     }
 
                     AuthDBCollection.findOneAndUpdate({ contact: req.body.contact }, { $set: data },
-                        { projection: { 'password': 0 }, returnDocument: "after" }).then(user => {
-                            res.status(200).json(user.value);
-                            if (user.value.status !== "ACTIVE") {
-                                redisClient.del(user.value._id.toString());
+                        { projection: { 'password': 0 }, returnDocument: "after" }).then(new_user => {
+                            res.status(200).json(new_user.value);
+                            if (new_user.value.status !== "ACTIVE") {
+                                redisClient.del(new_user.value._id.toString());
                             }
+                            
+                                if(req.body.status!==user.status){
+                                    accountStatusChange(new_user.value.full_name,new_user.value.email,user.status,new_user.value.status);
+                                }
                         }).catch(error => {
 
                             res.status(500).json({ message: "Error updating user account" });
@@ -270,7 +284,7 @@ router.put("/user/update", uploads.single("avatar"), ensureAuth, ensureActive, a
         }).catch(error => {
             res.status(500).json({ message: "Error retriving user, try again" });
             console.log(error)
-            logger.error(error)
+            logger.error(`Error retriving user, ${error}`)
         });
 
     } catch (error) {
@@ -288,7 +302,7 @@ router.get('/users/admin/all', generalrateLimiterMiddleware, ensureAuth, ensureA
         if (req.user.rank === "ADMIN" || req.user.rank === "SUPERADMIN") {
            
                     //fetch for Auth from DB and cache it
-                    AuthDBCollection.find({}, { projection: { "password": 0 } }).toArray().then((data) => {//fetch all documents
+                    AuthDBCollection.find({}, { projection: { "password": 0 },sort:{"createdAt":-1} }).toArray().then((data) => {//fetch all documents
 
                       
                         return res.status(200).json(data)
@@ -325,7 +339,7 @@ router.get('/users/all', generalrateLimiterMiddleware, ensureAuth, ensureActive,
     try {
 
         //fetch for Auth from DB and cache it
-        AuthDBCollection.find({}, { projection: { "password": 0, } }).toArray().then((data) => {//fetch all documents
+        AuthDBCollection.find({}, { projection: { "password": 0},sort:{"createdAt":-1} }).toArray().then((data) => {//fetch all documents
 
 
             return res.status(200).json(data)
@@ -342,7 +356,7 @@ router.get('/users/all', generalrateLimiterMiddleware, ensureAuth, ensureActive,
 }
 
 });
-//fetch all users for all
+//search  users for all
 router.post('/users/search', generalrateLimiterMiddleware, ensureAuth, ensureActive, async (req, res, next) => {
 
     try {
@@ -368,7 +382,7 @@ router.post('/users/search', generalrateLimiterMiddleware, ensureAuth, ensureAct
                         { "status": new RegExp('.*' + keyword + '.*') }
                     ]
                 },
-                    { projection: { "password": 0 } }).toArray().then((data) => {//fetch all documents
+                    { projection: { "password": 0 },sort:{"createdAt":-1} }).toArray().then((data) => {//fetch all documents
 
                         redisClient.set(`${keyword}_users`, JSON.stringify(data), 'EX', 600)
                         return res.status(200).json(data)
@@ -425,6 +439,7 @@ router.post('/user/request_code', async (req, res) => {
                         return res.status(400).json({ message: err })
                     }
                     res.status(200).json({ message: `Hello ${user.full_name}, your verification code is: ${otp_code}. Expires in 1 hr` })
+                    sendOTPEmail(user.full_name,user.email,otp_code);
                     //twilioSMS(`Hello ${user.full_name}, your verification code is: ${otp_code}. Expires in 3 Minutes`, user.contact).then(reply => {
                     // return res.status(200).json(`Hello ${user.full_name}, your verification code is: ${otp_code}. Expires in 3 Minutes`,)
                     // }).catch(e => { return res.status(400).json({ message: e }) })
@@ -441,9 +456,6 @@ router.post('/user/request_code', async (req, res) => {
 
     }
 });
-
-
-
 //verify otpcode and change password
 router.post("/user/change_password", async (req, res) => {
     const otp_code = req.body.otp_code
