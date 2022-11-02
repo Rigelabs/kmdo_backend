@@ -17,6 +17,10 @@ async function newUser(full_name, address) {
         from: 'admin@karingamassive.org',
         to: address,
         subject: "Welcome to Karinga Massive Development Organization",
+        attachments:[{
+            filename:"kmdo_constitution.pdf",
+            path:'https://raw.github.com/nodemailer/nodemailer/master/LICENSE'
+        }],
         html: `<html>
                 <head>
                 <style>
