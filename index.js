@@ -12,6 +12,7 @@ const generalLimiter = require('./middlewares/rateLimiters/genericLimiter');
 const refreshRouter= require('./routes/refreshToken')
 const authRouter= require('./routes/auth');
 const villageRouter=require("./routes/village");
+const reportsRouter= require("./routes/reports");
 
 const process =require('process');
 
@@ -68,6 +69,7 @@ app.listen(PORT,()=>{
 app.use('/',refreshRouter);
 app.use('/auth',authRouter);
 app.use('/village',villageRouter);
+app.use('/reports',reportsRouter);
 
 app.get('/', function (req, res) {
         res.send('Karinga Massive to the world!')

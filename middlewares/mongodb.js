@@ -59,8 +59,25 @@ AreaConnection.on('reconnected', err => {
 AreaConnection.on('error', err => {
     console.log('Area DB Error', err),
         logger.error(`Area DB Error',  ${err}, ${new Date}`)
+});
+
+const ReportsConnection = mongoose.createConnection(process.env.REPORTS_MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true, connectTimeoutMS: 60000 })
+ReportsConnection.once("open", function () {
+    console.log(`Connected to Reports DB, ${new Date}`)
+})
+ReportsConnection.on('disconnected', err => {
+    console.log('Reports DB disconnected'),
+        logger.error(`Reports DB disconnected  ${err}, ${new Date}`)
+})
+ReportsConnection.on('reconnected', err => {
+    console.log('Reports DB reconnected'),
+        logger.info('Reports DB reconnected')
+})
+ReportsConnection.on('error', err => {
+    console.log('Reports DB Error', err),
+        logger.error(`Reports DB Error',  ${err}, ${new Date}`)
 })
 module.exports = {
-    AuthDBConnection,VillageConnection,AreaConnection
+    AuthDBConnection,VillageConnection,AreaConnection,ReportsConnection
 };
 
