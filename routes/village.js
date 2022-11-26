@@ -23,7 +23,10 @@ router.post('/create', async (req, res) => {
                     name: name,
                    
                 }).then(saved=>{
-                return res.status(200).json({ message: "Village registered successfully" });
+                    VillageCollection.find({}).toArray().then(villages=>{
+                        return res.status(200).json(villages);
+                    })
+                
             });
         });
     } catch (error) {
@@ -36,7 +39,7 @@ router.post('/area/create', async (req, res) => {
     //validate data before adding a user
     try {
        
-        const { name,representative } = req.body;
+        const { name,village,representative } = req.body;
         //check if contact already exist in database
 
         await AreaCollection.findOne({name: name}).then(area => {
@@ -45,10 +48,13 @@ router.post('/area/create', async (req, res) => {
             }
                 AreaCollection.insertOne({
                     name: name,
+                    village:village,
                     representative:representative
                 }).then(saved=>{
-
-                return res.status(200).json({ message: "Area registered successfully" });
+                    AreaCollection.find({}).toArray().then(areas=>{
+                        return res.status(200).json(areas);
+                    })
+               
             });
         });
     } catch (error) {

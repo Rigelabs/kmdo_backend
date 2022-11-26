@@ -8,7 +8,7 @@ module.exports ={
         const authHeader= req.headers['authorization'];
         
         try {
-           
+         
             if (authHeader){
                 const bearer=authHeader.split(' ');
                 const token = bearer[1];
@@ -89,9 +89,18 @@ module.exports ={
             return next()
         }
     },
-          
+    ensureSuperAdmin: function(req,res,next){
+       
+        const {rank} = req.user;
+        if(rank !== "SUPERADMIN"){
+            return res.status(403).json({message:"Unathorized operation !"})
+        }else{
+            return next()
+        }
+    },    
     ensureActive: function(req,res,next){
         const {status} = req.user;
+       
         if(status !== "ACTIVE"){
             return res.status(403).json({message:"User account is inactive, contact your area representative"})
         }else{

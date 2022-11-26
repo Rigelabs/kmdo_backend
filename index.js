@@ -7,12 +7,12 @@ const env =require('dotenv');
 const path = require('path');
 const logger = require('./middlewares/logger');
 const rfs =require("rotating-file-stream");
-const generalLimiter = require('./middlewares/rateLimiters/genericLimiter');
 
 const refreshRouter= require('./routes/refreshToken')
 const authRouter= require('./routes/auth');
 const villageRouter=require("./routes/village");
 const reportsRouter= require("./routes/reports");
+const boardRouter= require("./routes/board");
 
 const process =require('process');
 
@@ -70,6 +70,7 @@ app.use('/',refreshRouter);
 app.use('/auth',authRouter);
 app.use('/village',villageRouter);
 app.use('/reports',reportsRouter);
+app.use('/board',boardRouter);
 
 app.get('/', function (req, res) {
         res.send('Karinga Massive to the world!')

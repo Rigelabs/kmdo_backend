@@ -76,7 +76,7 @@ router.post('/user/create', async (req, res) => {
             village, area } = req.body;
         //check if contact already exist in database
 
-        await AuthDBCollection.findOne({ contact: contact }).then(user_exist => {
+        await AuthDBCollection.findOne({ registration_number: registration_number }).then(user_exist => {
             if (user_exist) {
                 return res.status(400).json({ message: `User already exist` })
             }
@@ -86,6 +86,7 @@ router.post('/user/create', async (req, res) => {
                 occupation: occupation,
                 contact: contact,
                 village: village,
+                area_rep_approved:false,
                 status: "PENDING",
                 rank: "MEMBER",
                 area: area,
@@ -99,7 +100,7 @@ router.post('/user/create', async (req, res) => {
             }).then(saved => {
                 newUser(full_name,email);
                 newUserNotify(full_name,area,village,occupation,contact,registration_number);
-                return res.status(200).json({ message: "Account registered successfully, Please wait for validation" });
+                return res.status(200).json({ message: "Account registered successfully, Please wait for validation within 48hrs" });
             }).catch(error => {
                 return (res.status(500).json({ message: "Error saving account, try again" }),
                     logger.error(`Error saving account,${error}`))
@@ -186,7 +187,7 @@ router.post('/user/login', async (req, res) => {
 router.delete("/user/delete/:id", ensureAdmin, ensureActive, async (req, res) => {
     try {
         //Find user by Id
-        const user = await Auth.findById(req.params.user_id);
+        const user = await AuthDBCollection.findOne({registration_number:req.params.user_id});
         if (!user) {
             res.status(400).json({ message: "User not found" })
         }
@@ -463,12 +464,12 @@ router.post("/user/change_password", async (req, res) => {
     const password = req.body.password
 
     try {
-        if (otp_code && contact && password) {
+        if (contact && password) {
             await AuthDBCollection.findOne({ "contact": contact }).then(user => {
                 if (!user) {
                     res.status(400).json({ message: "Account doesn't not exist" })
                 } else {
-                    const string = `${contact}OTP`
+                    /*const string = `${contact}OTP`
 
                     //compare code in redis with the ones sent
                     redisClient.get(string.toString(), (err, redisData) => {
@@ -490,6 +491,7 @@ router.post("/user/change_password", async (req, res) => {
 
 
                         } else {
+                            */
                             //change password
                             //Hash the password
 
@@ -510,7 +512,7 @@ router.post("/user/change_password", async (req, res) => {
 
                                 redisClient.set(user._id.toString(), JSON.stringify({ refreshToken: refreshToken }));
                                 //delete otp code from redis
-                                redisClient.del(string)
+                              //  redisClient.del(string)
 
                                 const userInfo = {
                                     _id: user._id,
@@ -525,8 +527,8 @@ router.post("/user/change_password", async (req, res) => {
                                 return res.status(401).json({ message: "Password Change Failed" })
                             })
 
-                        }
-                    })
+                        //}
+                    //})
 
                 }
             }).catch(err => {
