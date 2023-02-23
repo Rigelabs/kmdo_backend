@@ -24,7 +24,7 @@ env.config();
 const schema = Joi.object({
 
     full_name: Joi.string().required().max(20).min(3),
-    identification_number: Joi.string().required().max(10).min(7),
+
 
     contact: Joi.string().required().min(13).max(14).error(new Error("Invalid Phone Number")),
     village: Joi.string().required(),
@@ -35,8 +35,7 @@ const schema = Joi.object({
 });
 const loginschema = Joi.object({
 
-    contact: Joi.string().required(),
-    password: Joi.string().required()
+    email: Joi.string().required(),
 });
 
 const nanoid = customAlphabet('1234567890', 6)
@@ -56,14 +55,6 @@ const uploads = multer({
         }
     }
 });
-const opts = {
-    redis: redisClient,
-    points: 5, // 5 points
-    duration: 60, // Per minute
-    blockDuration: 5 * 60, // block for 5 minutes if more than points consumed 
-};
-
-const rateLimiter = new RateLimiterRedis(opts);
 
 const AuthDBCollection = AuthDBConnection.collection("Auth")
 //SignUp
@@ -72,7 +63,7 @@ router.post('/user/create', async (req, res) => {
     //validate data before adding a user
     try {
         const bodyerror = await schema.validateAsync(req.body);
-        const { contact, identification_number, email, registration_number, occupation, full_name,
+        const { contact, email, registration_number, occupation, full_name,
             village, area } = req.body;
         //check if contact already exist in database
 
@@ -86,7 +77,7 @@ router.post('/user/create', async (req, res) => {
                 occupation: occupation,
                 contact: contact,
                 village: village,
-                area_rep_approved:false,
+                area_rep_approved: false,
                 status: "PENDING",
                 rank: "MEMBER",
                 area: area,
@@ -94,12 +85,12 @@ router.post('/user/create', async (req, res) => {
                 email: email,
                 createdAt: new Date,
                 registration_number: registration_number,
-                identification_number: identification_number,
+
                 avatar: "https://res.cloudinary.com/dwnxsji2z/image/upload/v1667125758/website%20files/user-avatar_ina40n.png",
                 cloudinary_id: "user-avatar_ina40n"
             }).then(saved => {
-                newUser(full_name,email);
-                newUserNotify(full_name,area,village,occupation,contact,registration_number);
+                newUser(full_name, email);
+                newUserNotify(full_name, area, village, occupation, contact, registration_number);
                 return res.status(200).json({ message: "Account registered successfully, Please wait for validation within 48hrs" });
             }).catch(error => {
                 return (res.status(500).json({ message: "Error saving account, try again" }),
@@ -119,60 +110,46 @@ router.post('/user/create', async (req, res) => {
 });
 
 router.post('/user/login', async (req, res) => {
+    
 
     try {
         const { bodyError } = await loginschema.validateAsync(req.body);
-        const { contact, password } = req.body;
+        const { email } = req.body;
         if (bodyError) {
             return res.status(400).json({ message: bodyError });
         } else {
             //check if contact  exist in database
-            await AuthDBCollection.findOne({ contact: contact }).then(user => {
+            await AuthDBCollection.findOne({ email: email }).then(user => {
 
                 if (!user || user.status !== "ACTIVE") {
                     res.status(401).json({ message: "Account doesn't not exist / inactive" })
                 } else {
                     //check if password match
 
-                    const validpass = bcrypt.compareSync(password, user.password);
-                    if (!validpass) {
-
-                        // Consume 1 point for each failed login attempt
-                        rateLimiter.consume(req.socket.remoteAddress)
-                            .then((data) => {
-                                // Message to user
-                                return res.status(400).json({ message: `Invalid Credentials, you have ${data.remainingPoints}  attempts left` });
-                            })
-                            .catch((rejRes) => {
-                                // Blocked
-                                const secBeforeNext = Math.ceil(rejRes.msBeforeNext / 60000) || 1;
-                                logger.error(`LoggingIn alert: Contact: ${req.body.contact} on IP: ${req.socket.remoteAddress} is Chocking Me !!`)
-                                return res.status(429).json({ message: `Too Many Trials, Retry-After ${String(secBeforeNext)} Minutes` });
-                            });
-
-                    } else {
-
-                        //create and assign a token once logged in
-
-                        const token = jwt.sign({ _id: user._id, rank: user.rank, status: user.status, area: user.area }, process.env.TOKEN_SECRET, { expiresIn: '1h' })
 
 
-                        const refreshToken = jwt.sign({ _id: user._id, rank: user.rank, status: user.status, area: user.area }, process.env.REFRESH_TOKEN_SECRET,
-                            { expiresIn: '1d' });
+                    //create and assign a token once logged in
 
-                        redisClient.set(user._id.toString(), JSON.stringify({ refreshToken: refreshToken }));
+                    const token = jwt.sign({ _id: user._id, rank: user.rank, status: user.status, area: user.area }, process.env.TOKEN_SECRET, { expiresIn: '1h' })
 
-                        const userInfo = {
-                            _id: user._id,
-                            rank: user.rank,
-                            full_name: user.full_name,
-                            area: user.area,
-                            contact: user.contact,
-                            avatar: user.avatar
-                        }
-                        res.header('token', token).json({ 'token': token, 'refreshToken': refreshToken, 'user': userInfo });
 
+                    const refreshToken = jwt.sign({ _id: user._id, rank: user.rank, status: user.status, area: user.area }, process.env.REFRESH_TOKEN_SECRET,
+                        { expiresIn: '1d' });
+
+                    redisClient.set(user._id.toString(), JSON.stringify({ refreshToken: refreshToken }));
+
+                    const userInfo = {
+                        _id: user._id,
+                        rank: user.rank,
+                        full_name: user.full_name,
+                        area: user.area,
+                        contact: user.contact,
+                        email: user.email,
+                        avatar: user.avatar
                     }
+                    res.header('token', token).json({ 'token': token, 'refreshToken': refreshToken, 'user': userInfo });
+
+
 
                 }
 
@@ -187,7 +164,7 @@ router.post('/user/login', async (req, res) => {
 router.delete("/user/delete/:id", ensureAdmin, ensureActive, async (req, res) => {
     try {
         //Find user by Id
-        const user = await AuthDBCollection.findOne({registration_number:req.params.user_id});
+        const user = await AuthDBCollection.findOne({ registration_number: req.params.user_id });
         if (!user) {
             res.status(400).json({ message: "User not found" })
         }
@@ -221,19 +198,19 @@ router.put("/user/update", uploads.single("avatar"), ensureAuth, ensureActive, a
                             occupation: req.body.occupation ? req.body.occupation : user.occupation,
                             village: req.body.village ? req.body.village : user.village,
                             area: req.body.area ? req.body.area : user.area,
-                            email: req.body.email ? req.body.email : user.email,
+                            
                             full_name: req.body.full_name ? req.body.full_name : user.full_name,
                             status: req.body.status && req.user.rank === "SUPERADMIN" ? req.body.status : user.status,
                             rank: req.body.rank && req.user.rank === "SUPERADMIN" ? req.body.rank : user.rank,
                             avatar: result ? result.secure_url : user.avatar,
                             cloudinary_id: result ? result.public_id : user.cloudinary_id
                         }
-                       
+
                         AuthDBCollection.findOneAndUpdate({ contact: req.body.contact }, { $set: data },
                             { projection: { 'password': 0 }, returnDocument: "after" }).then(new_user => {
-                              
-                                if(req.body.status!==user.status){
-                                    accountStatusChange(new_user.value.full_name,new_user.value.email,new_user.value.status);
+
+                                if (req.body.status !== user.status) {
+                                    accountStatusChange(new_user.value.full_name, new_user.value.email, new_user.value.status);
                                 }
                                 if (new_user.value.status !== "ACTIVE") {
                                     redisClient.del(new_user.value._id.toString());
@@ -245,8 +222,8 @@ router.put("/user/update", uploads.single("avatar"), ensureAuth, ensureActive, a
                                 return logger.error(`Error updating user account, ${req.user.user_id},${error}`);
 
                             })
-                    }).catch(e=>{
-                        
+                    }).catch(e => {
+
                         res.status(403).json({ message: "Error updating account, the selected is bigger than 10MB" });
                         logger.error(`Error updating avatar to cloudinary, ${e.error.message}`)
                     });
@@ -268,10 +245,10 @@ router.put("/user/update", uploads.single("avatar"), ensureAuth, ensureActive, a
                             if (new_user.value.status !== "ACTIVE") {
                                 redisClient.del(new_user.value._id.toString());
                             }
-                            
-                                if(req.body.status!==user.status){
-                                    accountStatusChange(new_user.value.full_name,new_user.value.email,user.status,new_user.value.status);
-                                }
+
+                            if (req.body.status !== user.status) {
+                                accountStatusChange(new_user.value.full_name, new_user.value.email, user.status, new_user.value.status);
+                            }
                         }).catch(error => {
 
                             res.status(500).json({ message: "Error updating user account" });
@@ -301,33 +278,33 @@ router.get('/users/admin/all', generalrateLimiterMiddleware, ensureAuth, ensureA
 
     try {
         if (req.user.rank === "ADMIN" || req.user.rank === "SUPERADMIN") {
-           
-                    //fetch for Auth from DB and cache it
-                    AuthDBCollection.find({}, { projection: { "password": 0 },sort:{"createdAt":-1} }).toArray().then((data) => {//fetch all documents
 
-                      
-                        return res.status(200).json(data)
+            //fetch for Auth from DB and cache it
+            AuthDBCollection.find({}, { projection: { "password": 0 }, sort: { "createdAt": -1 } }).toArray().then((data) => {//fetch all documents
 
-                    }).catch(err => {
-                        return logger.error(err)
-                    })
+
+                return res.status(200).json(data)
+
+            }).catch(err => {
+                return logger.error(err)
+            })
 
 
         } else {
             const area = req.user.area
 
-          
-                    //fetch for Auth from DB and cache it
-                    AuthDBCollection.find({ 'area': area }, { projection: { "password": 0 } }).toArray().then((data) => {//fetch all documents
 
-                       
-                        return res.status(200).json(data)
+            //fetch for Auth from DB and cache it
+            AuthDBCollection.find({ 'area': area }, { projection: { "password": 0 } }).toArray().then((data) => {//fetch all documents
 
-                    }).catch(err => {
-                        return logger.error(err)
-                    })
-                }
-         
+
+                return res.status(200).json(data)
+
+            }).catch(err => {
+                return logger.error(err)
+            })
+        }
+
     } catch (error) {
         logger.error(`${error.status || 500} - ${res.statusMessage} - ${error.message} - ${req.originalUrl} - ${req.method} - ${req.ip}`);
         return res.status(400).json({ message: error.message })
@@ -340,7 +317,7 @@ router.get('/users/all', generalrateLimiterMiddleware, ensureAuth, ensureActive,
     try {
 
         //fetch for Auth from DB and cache it
-        AuthDBCollection.find({}, { projection: { "password": 0},sort:{"createdAt":-1} }).toArray().then((data) => {//fetch all documents
+        AuthDBCollection.find({}, { projection: { "password": 0 }, sort: { "createdAt": -1 } }).toArray().then((data) => {//fetch all documents
 
 
             return res.status(200).json(data)
@@ -349,12 +326,12 @@ router.get('/users/all', generalrateLimiterMiddleware, ensureAuth, ensureActive,
             return logger.error(err)
         })
 
-    
-          
+
+
     } catch (error) {
-    logger.error(`${error.status || 500} - ${res.statusMessage} - ${error.message} - ${req.originalUrl} - ${req.method} - ${req.ip}`);
-    return res.status(400).json({ message: error.message })
-}
+        logger.error(`${error.status || 500} - ${res.statusMessage} - ${error.message} - ${req.originalUrl} - ${req.method} - ${req.ip}`);
+        return res.status(400).json({ message: error.message })
+    }
 
 });
 //search  users for all
@@ -383,7 +360,7 @@ router.post('/users/search', generalrateLimiterMiddleware, ensureAuth, ensureAct
                         { "status": new RegExp('.*' + keyword + '.*') }
                     ]
                 },
-                    { projection: { "password": 0 },sort:{"createdAt":-1} }).toArray().then((data) => {//fetch all documents
+                    { projection: { "password": 0 }, sort: { "createdAt": -1 } }).toArray().then((data) => {//fetch all documents
 
                         redisClient.set(`${keyword}_users`, JSON.stringify(data), 'EX', 600)
                         return res.status(200).json(data)
@@ -440,7 +417,7 @@ router.post('/user/request_code', async (req, res) => {
                         return res.status(400).json({ message: err })
                     }
                     res.status(200).json({ message: `Hello ${user.full_name}, your verification code is: ${otp_code}. Expires in 1 hr` })
-                    sendOTPEmail(user.full_name,user.email,otp_code);
+                    sendOTPEmail(user.full_name, user.email, otp_code);
                     //twilioSMS(`Hello ${user.full_name}, your verification code is: ${otp_code}. Expires in 3 Minutes`, user.contact).then(reply => {
                     // return res.status(200).json(`Hello ${user.full_name}, your verification code is: ${otp_code}. Expires in 3 Minutes`,)
                     // }).catch(e => { return res.status(400).json({ message: e }) })
@@ -492,42 +469,42 @@ router.post("/user/change_password", async (req, res) => {
 
                         } else {
                             */
-                            //change password
-                            //Hash the password
+                    //change password
+                    //Hash the password
 
-                            const salt = bcrypt.genSaltSync(10);
-                            var hashedPassword = bcrypt.hashSync(req.body.password, salt);
-                            const data = {
-                                password: hashedPassword
-                            }
+                    const salt = bcrypt.genSaltSync(10);
+                    var hashedPassword = bcrypt.hashSync(req.body.password, salt);
+                    const data = {
+                        password: hashedPassword
+                    }
 
-                            AuthDBCollection.findOneAndUpdate({ "contact": contact }, { $set: data }).then(saved => {
-                                //create and assign a token once code is verified
+                    AuthDBCollection.findOneAndUpdate({ "contact": contact }, { $set: data }).then(saved => {
+                        //create and assign a token once code is verified
 
-                                const token = jwt.sign({ _id: user._id, rank: user.rank, status: user.status, area: user.area }, process.env.TOKEN_SECRET, { expiresIn: "1h" })
+                        const token = jwt.sign({ _id: user._id, rank: user.rank, status: user.status, area: user.area }, process.env.TOKEN_SECRET, { expiresIn: "1h" })
 
 
-                                const refreshToken = jwt.sign({ _id: user._id, rank: user.rank, status: user.status, area: user.area }, process.env.REFRESH_TOKEN_SECRET,
-                                    { expiresIn: '1d' });
+                        const refreshToken = jwt.sign({ _id: user._id, rank: user.rank, status: user.status, area: user.area }, process.env.REFRESH_TOKEN_SECRET,
+                            { expiresIn: '1d' });
 
-                                redisClient.set(user._id.toString(), JSON.stringify({ refreshToken: refreshToken }));
-                                //delete otp code from redis
-                              //  redisClient.del(string)
+                        redisClient.set(user._id.toString(), JSON.stringify({ refreshToken: refreshToken }));
+                        //delete otp code from redis
+                        //  redisClient.del(string)
 
-                                const userInfo = {
-                                    _id: user._id,
-                                    rank: user.rank,
-                                    full_name: user.full_name,
-                                    area: user.area,
-                                    contact: user.contact,
-                                    avatar: user.avatar
-                                }
-                                return (res.header('token', token).json({ 'token': token, 'refreshToken': refreshToken, 'user': userInfo }));
-                            }).catch(err => {
-                                return res.status(401).json({ message: "Password Change Failed" })
-                            })
+                        const userInfo = {
+                            _id: user._id,
+                            rank: user.rank,
+                            full_name: user.full_name,
+                            area: user.area,
+                            contact: user.contact,
+                            avatar: user.avatar
+                        }
+                        return (res.header('token', token).json({ 'token': token, 'refreshToken': refreshToken, 'user': userInfo }));
+                    }).catch(err => {
+                        return res.status(401).json({ message: "Password Change Failed" })
+                    })
 
-                        //}
+                    //}
                     //})
 
                 }
