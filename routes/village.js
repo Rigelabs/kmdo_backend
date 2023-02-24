@@ -1,4 +1,5 @@
 const express = require('express');
+const { default: mongoose } = require('mongoose');
 const logger = require('../middlewares/logger');
 const { VillageConnection, AreaConnection } = require('../middlewares/mongodb');
 
@@ -55,6 +56,38 @@ router.post('/area/create', async (req, res) => {
                         return res.status(200).json(areas);
                     })
                
+            });
+        });
+    } catch (error) {
+        logger.error(`${error.status || 500} - ${req.body.contact} - ${req.body.email} - ${error.message} - ${req.originalUrl} - ${req.method} - ${req.ip}`);
+        return res.status(400).json({ message: error.message })
+    }
+});
+router.post('/area/update', async (req, res) => {
+
+    //validate data before adding a user
+    try {
+       
+        const { area_id,name,village,representative } = req.body;
+        //check if contact already exist in database
+        
+        await AreaCollection.findOne({_id: mongoose.Types.ObjectId(area_id)}).then(area => {
+            if (!area) {
+                return res.status(400).json({ message: `The area doesn't exist` })
+            }
+          
+                const data={
+                    name: name ? name :area.name,
+                    village:village ? village : area.village,
+                    representative:representative ? representative :area.representative
+                }
+                
+                AreaCollection.findOneAndUpdate({_id: mongoose.Types.ObjectId(area_id)},{ $set: data },
+                    { returnDocument: "after" }).then(new_area=>{
+                        
+                        AreaCollection.find({}).toArray().then(areas=>{
+                            return res.status(200).json(areas);
+                        })
             });
         });
     } catch (error) {
