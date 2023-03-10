@@ -61,6 +61,23 @@ AreaConnection.on('error', err => {
         logger.error(`Area DB Error',  ${err}, ${new Date}`)
 });
 
+const ProgramsConnection = mongoose.createConnection(process.env.PROGRAMS_MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true, connectTimeoutMS: 60000 })
+ProgramsConnection.once("open", function () {
+    console.log(`Connected to Programs DB, ${new Date}`)
+})
+ProgramsConnection.on('disconnected', err => {
+    console.log('Programs DB disconnected'),
+        logger.error(`Programs DB disconnected  ${err}, ${new Date}`)
+})
+ProgramsConnection.on('reconnected', err => {
+    console.log('Programs DB reconnected'),
+        logger.info('Programs DB reconnected')
+})
+ProgramsConnection.on('error', err => {
+    console.log('Programs DB Error', err),
+        logger.error(`Programs DB Error',  ${err}, ${new Date}`)
+})
+
 const ReportsConnection = mongoose.createConnection(process.env.REPORTS_MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true, connectTimeoutMS: 60000 })
 ReportsConnection.once("open", function () {
     console.log(`Connected to Reports DB, ${new Date}`)
@@ -78,6 +95,6 @@ ReportsConnection.on('error', err => {
         logger.error(`Reports DB Error',  ${err}, ${new Date}`)
 })
 module.exports = {
-    AuthDBConnection,VillageConnection,AreaConnection,ReportsConnection
+    AuthDBConnection,VillageConnection,AreaConnection,ReportsConnection,ProgramsConnection
 };
 

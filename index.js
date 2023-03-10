@@ -13,6 +13,7 @@ const authRouter= require('./routes/auth');
 const villageRouter=require("./routes/village");
 const reportsRouter= require("./routes/reports");
 const boardRouter= require("./routes/board");
+const programRouter= require("./routes/programs");
 
 const process =require('process');
 
@@ -71,6 +72,7 @@ app.use('/auth',authRouter);
 app.use('/village',villageRouter);
 app.use('/reports',reportsRouter);
 app.use('/board',boardRouter);
+app.use("/programs",programRouter);
 
 app.get('/', function (req, res) {
         res.send('Karinga Massive to the world!')
